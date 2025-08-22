@@ -1,3 +1,16 @@
+## Removed duplicate import of Application, CommandHandler, ContextTypes
+
+
+# Function to calculate future attendance
+def future_attendance(attended, total, future_attend, future_total, target=75):
+    A_new = attended + future_attend
+    T_new = total + future_total
+    final_percent = (A_new / T_new) * 100
+    max_skip = (A_new - (target/100) * T_new) / (target/100)
+    max_skip = int(max_skip) if max_skip > 0 else 0
+    return A_new, T_new, round(final_percent, 2), max_skip
+
+# /future command
 #!/usr/bin/env python3
 """
 Telegram bot: marks calculator + YouTube search + persistent storage (SQLite).
@@ -188,17 +201,40 @@ def youtube_search_links(query: str, api_key: str, max_results: int = 5) -> List
     return results
 
 # ---- Bot handlers ----
+def future_attendance(attended, total, future_attend, future_total, target=75):
+    A_new = attended + future_attend
+    T_new = total + future_total
+    final_percent = (A_new / T_new) * 100
+    max_skip = (A_new - (target/100) * T_new) / (target/100)
+    max_skip = int(max_skip) if max_skip > 0 else 0
+    return A_new, T_new, round(final_percent, 2), max_skip
+
+async def future(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    try:
+        attended, total, future_attend, future_total = map(int, context.args)
+        A_new, T_new, percent, skip = future_attendance(
+            attended, total, future_attend, future_total
+        )
+        msg = (
+            f"\U0001F4CA Attendance Forecast:\n\n"
+            f"\u27A1\uFE0F Final: {A_new}/{T_new} ({percent}%)\n"
+            f"\u27A1\uFE0F You can skip up to {skip} classes and still stay \u2265 75%."
+        )
+        await update.message.reply_text(msg)
+    except Exception:
+        await update.message.reply_text("\u26A0\uFE0F Usage: /future <attended> <total> <future_attend> <future_total>")
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     name = user.full_name or user.first_name or "Student"
     reply = (
         f"Hi {name}! 👋\n\n"
-        "I can help you calculate internals and tell you how many marks you need in external (out of 70) to pass.\n\n"
+        "I can help you calculate internals, forecast attendance, and search YouTube for study topics.\n\n"
         "Commands:\n"
         "/marks - Enter marks and calculate\n"
         "/mystats - Show your saved marks\n"
         "/yt <topic> - Search YouTube for topic (top 5)\n"
         "/reset - Reset your saved marks\n"
+        "/future <attended> <total> <future_attend> <future_total> - Attendance forecast\n"
         "/help - Show help\n"
     )
     await update.message.reply_text(reply)
@@ -397,6 +433,7 @@ def main():
     application.add_handler(CommandHandler("mystats", mystats))
     application.add_handler(CommandHandler("reset", reset_cmd))
     application.add_handler(CommandHandler("yt", yt_search))
+    application.add_handler(CommandHandler("future", future))
     application.add_handler(MessageHandler(filters.COMMAND, unknown))
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, unknown))
 
